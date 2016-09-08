@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(dvs_gazebo_plugin)
+project(gazebo_dvs_plugin)
 
 find_package(catkin REQUIRED COMPONENTS
   gazebo_ros
@@ -39,7 +39,7 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-    src/dvs_camera.cc
+    src/dvs_plugin.cpp
 )
 add_dependencies(${PROJECT_NAME}
     ${catkin_EXPORTED_TARGETS}
