@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
   <name>gazebo_dvs_plugin</name>
-  <version>0.0.0</version>
-  <description>The gazebo_dvs_plugin package</description>
+  <version>0.0.1</version>
+  <description>A basic sensor plugin allowing for efficient DVS approximation and event generation.</description>
 
   <license>TODO</license>
 
