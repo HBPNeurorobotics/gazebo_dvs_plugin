@@ -18,10 +18,6 @@
 /*
  * IMPLEMENTATION INSPIRED BY
  * https://github.com/PX4/sitl_gazebo/blob/master/src/gazebo_opticalFlow_plugin.cpp
- *
- *
- *
- *
  */
 
 #ifdef _WIN32
@@ -41,8 +37,8 @@
 
 #include <ros/ros.h>
 #include <ros/console.h>
-#include <opencv2/opencv.hpp>
 
+#include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
@@ -59,8 +55,7 @@ namespace gazebo
     ////////////////////////////////////////////////////////////////////////////////
     // Constructor
     DvsPlugin::DvsPlugin()
-    : SensorPlugin(), width(0), height(0), depth(0),
-    event_topic_name_("events")
+    : SensorPlugin(), width(0), height(0), depth(0)
   {
   }
 
@@ -73,39 +68,21 @@ namespace gazebo
   }
 
   void DvsPlugin::Load(sensors::SensorPtr _sensor, sdf::ElementPtr _sdf)
-  { 
+  {
     if (!_sensor)
-      gzerr << "Invalid sensor pointer.\n";
-
-    this->parentSensor =
-#if GAZEBO_MAJOR_VERSION >= 7
-      std::dynamic_pointer_cast<sensors::CameraSensor>(_sensor);
-#else
-    boost::dynamic_pointer_cast<sensors::CameraSensor>(_sensor);
-#endif
-
-/*
-    if (!this->parentSensor)
-    {
-      gzerr << "DvsPlugin requires a CameraSensor.\n";
-#if GAZEBO_MAJOR_VERSION >= 7
-      if (std::dynamic_pointer_cast<sensors::DepthCameraSensor>(_sensor))
-#else
-      if (boost::dynamic_pointer_cast<sensors::DepthCameraSensor>(_sensor))
-#endif
-          gzmsg << "It is a depth camera sensor\n";
-    }
-*/
+      gzerr << "Invalid sensor pointer." << endl;
 
 #if GAZEBO_MAJOR_VERSION >= 7
+    this->parentSensor = std::dynamic_pointer_cast<sensors::CameraSensor>(_sensor);
     this->camera = this->parentSensor->Camera();
 #else
+    this->parentSensor = boost::dynamic_pointer_cast<sensors::CameraSensor>(_sensor);
     this->camera = this->parentSensor->GetCamera();
 #endif
 
     if (!this->parentSensor)
     {
-      gzerr << "DvsPlugin not attached to a camera sensor\n";
+      gzerr << "DvsPlugin not attached to a camera sensor." << endl;
       return;
     }
 
@@ -121,11 +98,10 @@ namespace gazebo
     this->format = this->camera->GetImageFormat();
 #endif
 
-
     if (_sdf->HasElement("robotNamespace"))
       namespace_ = _sdf->GetElement("robotNamespace")->Get<std::string>();
     else
-      gzwarn << "[gazebo_ros_dvs_camera] Please specify a robotNamespace.\n";
+      gzwarn << "[gazebo_ros_dvs_camera] Please specify a robotNamespace." << endl;
 
     node_handle_ = ros::NodeHandle(namespace_);
 
@@ -133,13 +109,18 @@ namespace gazebo
     if (_sdf->HasElement("cameraName"))
       sensorName = _sdf->GetElement("cameraName")->Get<std::string>() + "/";
     else
-      gzwarn << "[gazebo_ros_dvs_camera] Please specify a cameraName.\n";
+      gzwarn << "[gazebo_ros_dvs_camera] Please specify a cameraName." << endl;
 
     string topicName = "dvs_events";
     if (_sdf->HasElement("eventsTopicName"))
       topicName = _sdf->GetElement("eventsTopicName")->Get<std::string>();
 
     const string topic = sensorName + topicName;
+
+    if (_sdf->HasElement("eventThreshold"))
+      this->event_threshold = _sdf->GetElement("eventThreshold")->Get<float>();
+    else
+      gzwarn << "[gazebo_ros_dvs_camera] Please specify a DVS threshold." << endl;
 
     event_pub_ = node_handle_.advertise<dvs_msgs::EventArray>(topic, 10, 10.0);
 
@@ -161,17 +142,16 @@ namespace gazebo
     _image = this->camera->GetImageData(0);
 #endif
 
-/*
+    /*
 #if GAZEBO_MAJOR_VERSION >= 7
-    float rate = this->camera->RenderRate();
+float rate = this->camera->RenderRate();
 #else
-    float rate = this->camera->GetRenderRate();
+float rate = this->camera->GetRenderRate();
 #endif
-    if (!isfinite(rate))
-      rate =  30.0;
-    float dt = 1.0 / rate;
-*/
-
+if (!isfinite(rate))
+rate =  30.0;
+float dt = 1.0 / rate;
+     */
 
     // convert given frame to opencv image
     cv::Mat input_image(_height, _width, CV_8UC3);
@@ -179,21 +159,22 @@ namespace gazebo
 
     // color to grayscale
     cv::Mat curr_image_rgb(_height, _width, CV_8UC3);
-    cvtColor(input_image, curr_image_rgb, CV_RGB2BGR); 
+    cvtColor(input_image, curr_image_rgb, CV_RGB2BGR);
     cvtColor(curr_image_rgb, input_image, CV_BGR2GRAY);
 
     cv::Mat curr_image = input_image;
 
-    /* TODO compatibility
-       try {
-       cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(*_image, sensor_msgs::image_encodings::BGR8);
-       std::cout << "Image: " << std::endl << " " << cv_ptr->image << std::endl << std::endl;
-       } catch (cv_bridge::Exception& e)
-       {
-       ROS_ERROR("cv_bridge exception %s", e.what());
-       std::cout << "ERROR";
-       }
-     */
+/* TODO any encoding configuration should be supported
+    try {
+      cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(*_image, sensor_msgs::image_encodings::BGR8);
+      std::cout << "Image: " << std::endl << " " << cv_ptr->image << std::endl << std::endl;
+    } 
+    catch (cv_bridge::Exception& e)
+    {
+      ROS_ERROR("cv_bridge exception %s", e.what());
+      std::cout << "ERROR";
+    }
+*/
 
     assert(_height == height && _width == width);
     if (this->has_last_image)
@@ -215,14 +196,18 @@ namespace gazebo
 
       this->publishEvents(&events);
     }
+    else
+    {
+      gzwarn << "Unexpected change in image size. Publishing no events for this frame change." << endl;
+    }
   }
 
   void DvsPlugin::fillEvents(cv::Mat diff, int polarity, std::vector<dvs_msgs::Event> *events)
   {
-    float threshold = 0.001;
+    cv::Mat binary = diff > event_threshold;
 
-    cv::Mat binary = diff > threshold;
-
+    // findNonZero fails when there are no zeros
+    // TODO is there a better workaround then iterating the binary image twice?
     if (cv::countNonZero(binary) != 0)
     {
       std::vector<cv::Point> locs;
@@ -247,14 +232,12 @@ namespace gazebo
       dvs_msgs::EventArray msg;
       msg.events.clear();
       msg.events.insert(msg.events.end(), events->begin(), events->end());
-      msg.width = this->width;
-      msg.height = this->height; 
- 
-      msg.header.frame_id = this->namespace_;
-/* TODO
-      msg.header.stamp.sec = this->sensor_update_time_.sec;
-      msg.header.stamp.nsec = this->sensor_update_time_.nsec;
-*/
+      msg.width = width;
+      msg.height = height;
+
+      // TODO what frame_id is adequate?
+      msg.header.frame_id = namespace_;
+      msg.header.stamp = ros::Time::now();
 
       event_pub_.publish(msg);
     }

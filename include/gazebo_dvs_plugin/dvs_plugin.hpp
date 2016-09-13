@@ -58,11 +58,10 @@ namespace gazebo
     protected: ros::NodeHandle node_handle_;
     protected: ros::Publisher event_pub_;
     protected: string namespace_;
-    protected: string event_topic_name_;
 
     private: Mat last_image;
     private: bool has_last_image;
-
+    private: float event_threshold;
     private: void processDelta(Mat *last_image, Mat *curr_image);
     private: void fillEvents(Mat diff, int polarity, vector<dvs_msgs::Event> *events);
     private: void publishEvents(vector<dvs_msgs::Event> *events);
