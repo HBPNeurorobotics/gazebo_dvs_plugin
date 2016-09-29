@@ -111,7 +111,7 @@ namespace gazebo
     else
       gzwarn << "[gazebo_ros_dvs_camera] Please specify a cameraName." << endl;
 
-    string topicName = "dvs_events";
+    string topicName = "events";
     if (_sdf->HasElement("eventsTopicName"))
       topicName = _sdf->GetElement("eventsTopicName")->Get<std::string>();
 
