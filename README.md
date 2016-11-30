@@ -9,10 +9,6 @@ For this, clone the [RPG DVS ROS](https://github.com/uzh-rpg/rpg_dvs_ros) packag
 
 Then, clone this package into your workspace and rebuild.
 
-Optionally, integrate the [FZI DVS](https://ids-git.fzi.de/hbp/dvs_ros_simulation) package into your catkin workspace
-for further DVS related utilities, like event stream visualization.
-This plugin package is a candidate for being merged into the just mentioned aggregate package.
-
 ## Usage
 
 This plugin can be used as a drop-in replacement for normal Gazebo camera plugins.
@@ -54,5 +50,3 @@ The parameter `eventThreshold` specifies the pixel-wise threshold which has to b
 The sensor parameter `update_rate` has only limited effect in Gazebo.
 The real rate is determined by the rendering pipeline and can be way lower than the specified rate.
 Still, this implementation yields a higher event frequency than similar Python-based implementations as a standalone node.
-
-
