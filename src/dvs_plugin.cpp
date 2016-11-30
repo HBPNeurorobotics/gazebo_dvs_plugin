@@ -28,15 +28,16 @@
 
 #include <string>
 
-#include <gazebo/sensors/Sensor.hh>
+#include <ros/ros.h>
+#include <ros/console.h>
+
+#include <gazebo/common/Plugin.hh>
 #include <gazebo/sensors/CameraSensor.hh>
-#include <gazebo/sensors/SensorTypes.hh>
+#include <gazebo/rendering/Camera.hh>
+#include <gazebo/util/system.hh>
 
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
-
-#include <ros/ros.h>
-#include <ros/console.h>
 
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -168,7 +169,7 @@ float dt = 1.0 / rate;
     try {
       cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(*_image, sensor_msgs::image_encodings::BGR8);
       std::cout << "Image: " << std::endl << " " << cv_ptr->image << std::endl << std::endl;
-    } 
+    }
     catch (cv_bridge::Exception& e)
     {
       ROS_ERROR("cv_bridge exception %s", e.what());

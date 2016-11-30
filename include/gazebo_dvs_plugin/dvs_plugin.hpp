@@ -21,10 +21,11 @@
 #include <string>
 #include <ros/ros.h>
 
-#include <gazebo/gazebo.hh>
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/sensors/CameraSensor.hh>
 #include <gazebo/rendering/Camera.hh>
+#include <gazebo/util/system.hh>
+
 
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
@@ -68,4 +69,3 @@ namespace gazebo
   };
 }
 #endif
-

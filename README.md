@@ -12,8 +12,8 @@ Then, clone this package into your workspace and rebuild.
 ## Usage
 
 This plugin can be used as a drop-in replacement for normal Gazebo camera plugins.
-Both, the DVS plugin and the [CameraPlugin](https://github.com/arpg/Gazebo/blob/master/plugins/CameraPlugin.cc)
-use the Gazebo [CameraSensor](https://github.com/arpg/Gazebo/blob/master/gazebo/sensors/CameraSensor.cc) internally.
+Both, the DVS plugin and the [CameraPlugin](https://bitbucket.org/osrf/gazebo/src/666bf30ad9a3c042955b55f79cf1a5416a70d83d/plugins/CameraPlugin.cc)
+use the Gazebo [CameraSensor](https://bitbucket.org/osrf/gazebo/src/666bf30ad9a3c042955b55f79cf1a5416a70d83d/gazebo/sensors/CameraSensor.cc) internally.
 
 The following SDF snippet shows an example usage:
 
