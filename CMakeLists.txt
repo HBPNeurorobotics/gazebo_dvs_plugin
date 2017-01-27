@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(gazebo_dvs_plugin)
 
+# Check c++11 / c++0x
+# Added for NRP
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX11)
+    message(STATUS "Compiler supports cxx11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+elseif(COMPILER_SUPPORTS_CXX0X)
+    message(STATUS "Compiler supports c++0x")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+endif()
+# End of NRP check
+
 find_package(catkin REQUIRED COMPONENTS
   gazebo_ros
   gazebo_plugins
