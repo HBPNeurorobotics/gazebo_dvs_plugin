@@ -41,7 +41,9 @@ catkin_package(
 ## Build ##
 ###########
 
-link_directories(${GAZEBO_LIBRARY_DIRS})
+link_directories(${GAZEBO_LIBRARY_DIRS}
+                 ${OGRE_LIBRARY_DIRS}
+                )
 include_directories(
   include
   ${TBB_INCLUDE_DIR}
