@@ -50,3 +50,19 @@ The parameter `eventThreshold` specifies the pixel-wise threshold which has to b
 The sensor parameter `update_rate` has only limited effect in Gazebo.
 The real rate is determined by the rendering pipeline and can be way lower than the specified rate.
 Still, this implementation yields a higher event frequency than similar Python-based implementations as a standalone node.
+
+# Acknowledgement
+
+If you used this code for your research, please consider citing the paper [Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks](http://ieeexplore.ieee.org/document/7862386/).
+
+```
+@INPROCEEDINGS{7862386,
+author={J. Kaiser and J. C. V. Tieck and C. Hubschneider and P. Wolf and M. Weber and M. Hoff and A. Friedrich and K. Wojtasik and A. Roennau and R. Kohlhaas and R. Dillmann and J. M. Zöllner},
+booktitle={2016 IEEE International Conference on Simulation, Modeling, and Programming for Autonomous Robots (SIMPAR)},
+title={Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks},
+year={2016},
+pages={127-134},
+keywords={automobiles;cameras;complex networks;feedforward neural nets;learning (artificial intelligence);mobile robots;DVS;camera images;complex networks;deep learning architectures;end-to-end simulated vehicle control;hand-crafted feature detectors;neural self-driving vehicle applications;neurorobotics applications;rate-based neural networks;silicon retina;spiking neural networks;steering wheel decoder;vehicle end-to-end for lane following behavior;Biological neural networks;Brain modeling;Cameras;Robot sensing systems;Voltage control},
+doi={10.1109/SIMPAR.2016.7862386},
+month={Dec},}
+```
