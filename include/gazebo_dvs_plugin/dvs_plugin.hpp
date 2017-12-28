@@ -79,8 +79,11 @@ namespace gazebo
     protected: string namespace_;
 
     private: Mat last_image;
+    private: Mat ref_image;
+    private: ros::Time received_last;
     private: bool has_last_image;
     private: float event_threshold;
+    private: void updateDVS(ros::Time received_current, Mat *curr_image);
     private: void processDelta(Mat *last_image, Mat *curr_image);
     private: void fillEvents(Mat *diff, int polarity, vector<dvs_msgs::Event> *events);
     private: void publishEvents(vector<dvs_msgs::Event> *events);

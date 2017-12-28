@@ -155,33 +155,22 @@ namespace gazebo
       unsigned int _width, unsigned int _height, unsigned int _depth,
       const std::string &_format)
   {
+    ros::Time received_current = ros::Time::now();
+    
 #if GAZEBO_MAJOR_VERSION >= 7
     _image = this->camera->ImageData(0);
 #else
     _image = this->camera->GetImageData(0);
 #endif
 
-    /*
-#if GAZEBO_MAJOR_VERSION >= 7
-float rate = this->camera->RenderRate();
-#else
-float rate = this->camera->GetRenderRate();
-#endif
-if (!isfinite(rate))
-rate =  30.0;
-float dt = 1.0 / rate;
-     */
-
     // convert given frame to opencv image
     cv::Mat input_image(_height, _width, CV_8UC3);
+    cv::Mat curr_image(_height, _width, CV_8UC1);
+    
     input_image.data = (uchar*)_image;
 
-    // color to grayscale
-    cv::Mat curr_image_rgb(_height, _width, CV_8UC3);
-    cvtColor(input_image, curr_image_rgb, CV_RGB2BGR);
-    cvtColor(curr_image_rgb, input_image, CV_BGR2GRAY);
-
-    cv::Mat curr_image = input_image;
+    cvtColor(input_image, input_image, CV_RGB2BGR);
+    cvtColor(input_image, curr_image, CV_BGR2GRAY);
 
 /* TODO any encoding configuration should be supported
     try {
@@ -198,16 +187,90 @@ float dt = 1.0 / rate;
     assert(_height == height && _width == width);
     if (this->has_last_image)
     {
-      this->processDelta(&this->last_image, &curr_image);
+      this->updateDVS(received_current, &curr_image);
     }
     else if (curr_image.size().area() > 0)
     {
       this->last_image = curr_image;
+      curr_image.convertTo(this->ref_image, CV_32FC1);
+      this->received_last = received_current;
       this->has_last_image = true;
     }
     else
     {
       gzwarn << "Ignoring empty image." << endl;
+    }
+  }
+  
+  void DvsPlugin::updateDVS(ros::Time received_current, cv::Mat *curr_image)
+  {
+    if (curr_image->size() == this->last_image.size())
+    {
+      ros::Duration delta_t = received_current - this->received_last;
+      
+      std::vector<dvs_msgs::Event> events;
+
+      for(int y = 0; y < curr_image->rows; y++)
+      {
+      	for(int x = 0; x < curr_image->cols; x++)
+	{
+          int it = (int)this->last_image.at<uchar>(y,x); // TODO check if pointer method faster than at??
+          int it_dt = (int)curr_image->at<uchar>(y,x);
+          float ref = this->ref_image.at<float>(y,x);
+	  int polarity = (it_dt>=it) ? (1) : (-1);
+	  
+	  if(fabs(it_dt-it) > 1e-6) // TODO are these float values in rpg davis version??
+	  {
+	    
+	    std::vector<float> list_crossings;
+	    bool all_crossings_found = false;
+	    float current_crossing = ref;
+	    
+	    while(!all_crossings_found) // TODO make it directly, so that list_crossings is unnecessary!
+	    {
+	      current_crossing = current_crossing + polarity*(this->event_threshold);
+	      if(polarity > 0)
+	      {
+		if(current_crossing > it && current_crossing <= it_dt)
+		  list_crossings.push_back(current_crossing);
+		else
+		  all_crossings_found = true;
+	      }
+	      else
+	      {
+		if(current_crossing < it && current_crossing >= it_dt)
+		  list_crossings.push_back(current_crossing);
+		else
+		  all_crossings_found = true;
+	      }
+	    }
+	    
+	    for(int i = 0; i<list_crossings.size(); ++i)
+	    {
+	      ros::Time event_ts = this->received_last + delta_t * ((list_crossings[i]-1.0*it) / (1.0*(it_dt-it)));
+	      
+	      dvs_msgs::Event event_i;
+	      event_i.x = x;
+	      event_i.y = y;
+	      event_i.ts = event_ts;
+	      event_i.polarity = (polarity>0);
+	      
+	      events.push_back(event_i);
+	    }
+	    
+	    if(list_crossings.size() > 0)
+	      this->ref_image.at<float>(y,x) = list_crossings.back();
+	  }
+	}
+      }
+      std::cout << " Events: " << events.size() << std::endl;
+
+      this->publishEvents(&events);
+      curr_image->copyTo(this->last_image);
+    }
+    else
+    {
+      gzwarn << "Unexpected change in image size (" << this->last_image.size() << " -> " << curr_image->size() << "). Publishing no events for this frame change." << endl;
     }
   }
 
@@ -226,9 +289,9 @@ float dt = 1.0 / rate;
 
       *last_image += pos_mask & pos_diff;
       *last_image -= neg_mask & neg_diff;
-
+      
       std::vector<dvs_msgs::Event> events;
-
+      
       this->fillEvents(&pos_mask, 0, &events);
       this->fillEvents(&neg_mask, 1, &events);
 
