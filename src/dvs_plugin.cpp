@@ -155,8 +155,8 @@ namespace gazebo
       unsigned int _width, unsigned int _height, unsigned int _depth,
       const std::string &_format)
   {
+    //std::cout << "time: " << ros::Time::now() - thi received_current << std::endl;
     ros::Time received_current = ros::Time::now();
-    
 #if GAZEBO_MAJOR_VERSION >= 7
     _image = this->camera->ImageData(0);
 #else
@@ -168,8 +168,9 @@ namespace gazebo
     cv::Mat curr_image(_height, _width, CV_8UC1);
     
     input_image.data = (uchar*)_image;
+    //curr_image.data = (uchar*)_image;
 
-    cvtColor(input_image, input_image, CV_RGB2BGR);
+    //cvtColor(input_image, input_image, CV_RGB2BGR);
     cvtColor(input_image, curr_image, CV_BGR2GRAY);
 
 /* TODO any encoding configuration should be supported
@@ -188,6 +189,7 @@ namespace gazebo
     if (this->has_last_image)
     {
       this->updateDVS(received_current, &curr_image);
+      this->received_last = received_current;
     }
     else if (curr_image.size().area() > 0)
     {
@@ -263,7 +265,7 @@ namespace gazebo
 	  }
 	}
       }
-      std::cout << " Events: " << events.size() << std::endl;
+      //std::cout << " Events: " << events.size() << std::endl;
 
       this->publishEvents(&events);
       curr_image->copyTo(this->last_image);
