@@ -85,6 +85,7 @@ namespace gazebo
     private: float event_threshold;
     private: void updateDVS(ros::Time received_current, Mat *curr_image);
     private: void processDelta(Mat *last_image, Mat *curr_image);
+    private: void appendEvent(std::vector<dvs_msgs::Event> *events, int x, int y, ros::Time ts, bool polarity);
     private: void fillEvents(Mat *diff, int polarity, vector<dvs_msgs::Event> *events);
     private: void publishEvents(vector<dvs_msgs::Event> *events);
   };

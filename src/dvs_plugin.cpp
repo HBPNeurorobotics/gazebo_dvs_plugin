@@ -155,8 +155,8 @@ namespace gazebo
       unsigned int _width, unsigned int _height, unsigned int _depth,
       const std::string &_format)
   {
-    //std::cout << "time: " << ros::Time::now() - thi received_current << std::endl;
     ros::Time received_current = ros::Time::now();
+    //std::cout << "time: " << received_current - this->received_last << std::endl;
 #if GAZEBO_MAJOR_VERSION >= 7
     _image = this->camera->ImageData(0);
 #else
@@ -204,6 +204,16 @@ namespace gazebo
     }
   }
   
+  void DvsPlugin::appendEvent(std::vector<dvs_msgs::Event> *events, int x, int y, ros::Time ts, bool polarity)
+  {
+    dvs_msgs::Event event_i;
+    event_i.x = x;
+    event_i.y = y;
+    event_i.ts = ts;
+    event_i.polarity = polarity;
+    events->push_back(event_i);
+  }
+  
   void DvsPlugin::updateDVS(ros::Time received_current, cv::Mat *curr_image)
   {
     if (curr_image->size() == this->last_image.size())
@@ -218,57 +228,41 @@ namespace gazebo
 	{
           int it = (int)this->last_image.at<uchar>(y,x); // TODO check if pointer method faster than at??
           int it_dt = (int)curr_image->at<uchar>(y,x);
+	  int it_diff = it_dt-it;
           float ref = this->ref_image.at<float>(y,x);
-	  int polarity = (it_dt>=it) ? (1) : (-1);
 	  
-	  if(fabs(it_dt-it) > 1e-6) // TODO are these float values in rpg davis version??
+	  if(it_diff > 1e-6) // ON-Events
 	  {
-	    
-	    std::vector<float> list_crossings;
-	    bool all_crossings_found = false;
-	    float current_crossing = ref;
-	    
-	    while(!all_crossings_found) // TODO make it directly, so that list_crossings is unnecessary!
+	    float current_crossing = ref + (this->event_threshold);
+	    for(; current_crossing <= it_dt; current_crossing += (this->event_threshold))
 	    {
-	      current_crossing = current_crossing + polarity*(this->event_threshold);
-	      if(polarity > 0)
-	      {
-		if(current_crossing > it && current_crossing <= it_dt)
-		  list_crossings.push_back(current_crossing);
-		else
-		  all_crossings_found = true;
-	      }
-	      else
-	      {
-		if(current_crossing < it && current_crossing >= it_dt)
-		  list_crossings.push_back(current_crossing);
-		else
-		  all_crossings_found = true;
-	      }
+	      ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
+	      appendEvent(&events, x, y, event_ts, true);
 	    }
-	    
-	    for(int i = 0; i<list_crossings.size(); ++i)
-	    {
-	      ros::Time event_ts = this->received_last + delta_t * ((list_crossings[i]-1.0*it) / (1.0*(it_dt-it)));
-	      
-	      dvs_msgs::Event event_i;
-	      event_i.x = x;
-	      event_i.y = y;
-	      event_i.ts = event_ts;
-	      event_i.polarity = (polarity>0);
-	      
-	      events.push_back(event_i);
-	    }
-	    
-	    if(list_crossings.size() > 0)
-	      this->ref_image.at<float>(y,x) = list_crossings.back();
+	    current_crossing -= (this->event_threshold);
+	    if(current_crossing > ref)
+	      this->ref_image.at<float>(y,x) = current_crossing;
 	  }
+	  else if(it_diff < -1e-6) // OFF-Events
+	  {
+	    float current_crossing = ref - (this->event_threshold);
+	    for(; current_crossing >= it_dt; current_crossing -= (this->event_threshold))
+	    {
+	      ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
+	      appendEvent(&events, x, y, event_ts, false);
+	    }
+	    current_crossing += (this->event_threshold);
+	    if(current_crossing < ref)
+	      this->ref_image.at<float>(y,x) = current_crossing;
+	  }
+	  //else
+	    //std::cout << "Pixel values numerically probably the same." << std::endl;
 	}
       }
-      //std::cout << " Events: " << events.size() << std::endl;
-
+      
       this->publishEvents(&events);
-      curr_image->copyTo(this->last_image);
+      //curr_image->copyTo(this->last_image); // necessary ?? just adjust pointer??
+      this->last_image = *curr_image;
     }
     else
     {
