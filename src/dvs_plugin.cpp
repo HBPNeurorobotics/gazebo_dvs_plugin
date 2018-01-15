@@ -166,7 +166,7 @@ namespace gazebo
     // convert given frame to opencv image
     cv::Mat input_image(_height, _width, CV_8UC3);
     cv::Mat curr_image(_height, _width, CV_8UC1);
-    
+
     input_image.data = (uchar*)_image;
     //curr_image.data = (uchar*)_image;
 
@@ -203,7 +203,7 @@ namespace gazebo
       gzwarn << "Ignoring empty image." << endl;
     }
   }
-  
+
   void DvsPlugin::appendEvent(std::vector<dvs_msgs::Event> *events, int x, int y, ros::Time ts, bool polarity)
   {
     dvs_msgs::Event event_i;
@@ -213,53 +213,53 @@ namespace gazebo
     event_i.polarity = polarity;
     events->push_back(event_i);
   }
-  
+
   void DvsPlugin::updateDVS(ros::Time received_current, cv::Mat *curr_image)
   {
     if (curr_image->size() == this->last_image.size())
     {
       ros::Duration delta_t = received_current - this->received_last;
-      
+
       std::vector<dvs_msgs::Event> events;
 
       for(int y = 0; y < curr_image->rows; y++)
       {
-      	for(int x = 0; x < curr_image->cols; x++)
-	{
+        for(int x = 0; x < curr_image->cols; x++)
+        {
           int it = (int)this->last_image.at<uchar>(y,x); // TODO check if pointer method faster than at??
           int it_dt = (int)curr_image->at<uchar>(y,x);
-	  int it_diff = it_dt-it;
+          int it_diff = it_dt-it;
           float ref = this->ref_image.at<float>(y,x);
-	  
-	  if(it_diff > 1e-6) // ON-Events
-	  {
-	    float current_crossing = ref + (this->event_threshold);
-	    for(; current_crossing <= it_dt; current_crossing += (this->event_threshold))
-	    {
-	      ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
-	      appendEvent(&events, x, y, event_ts, true);
-	    }
-	    current_crossing -= (this->event_threshold);
-	    if(current_crossing > ref)
-	      this->ref_image.at<float>(y,x) = current_crossing;
-	  }
-	  else if(it_diff < -1e-6) // OFF-Events
-	  {
-	    float current_crossing = ref - (this->event_threshold);
-	    for(; current_crossing >= it_dt; current_crossing -= (this->event_threshold))
-	    {
-	      ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
-	      appendEvent(&events, x, y, event_ts, false);
-	    }
-	    current_crossing += (this->event_threshold);
-	    if(current_crossing < ref)
-	      this->ref_image.at<float>(y,x) = current_crossing;
-	  }
-	  //else
-	    //std::cout << "Pixel values numerically probably the same." << std::endl;
-	}
+
+          if(it_diff > 1e-6) // ON-Events
+          {
+            float current_crossing = ref + (this->event_threshold);
+            for(; current_crossing <= it_dt; current_crossing += (this->event_threshold))
+            {
+              ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
+              appendEvent(&events, x, y, event_ts, true);
+            }
+            current_crossing -= (this->event_threshold);
+            if(current_crossing > ref)
+              this->ref_image.at<float>(y,x) = current_crossing;
+          }
+          else if(it_diff < -1e-6) // OFF-Events
+          {
+            float current_crossing = ref - (this->event_threshold);
+            for(; current_crossing >= it_dt; current_crossing -= (this->event_threshold))
+            {
+              ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
+              appendEvent(&events, x, y, event_ts, false);
+            }
+            current_crossing += (this->event_threshold);
+            if(current_crossing < ref)
+              this->ref_image.at<float>(y,x) = current_crossing;
+          }
+          //else
+            //std::cout << "Pixel values numerically probably the same." << std::endl;
+        }
       }
-      
+
       this->publishEvents(&events);
       //curr_image->copyTo(this->last_image); // necessary ?? just adjust pointer??
       this->last_image = *curr_image;
@@ -285,9 +285,9 @@ namespace gazebo
 
       *last_image += pos_mask & pos_diff;
       *last_image -= neg_mask & neg_diff;
-      
+
       std::vector<dvs_msgs::Event> events;
-      
+
       this->fillEvents(&pos_mask, 0, &events);
       this->fillEvents(&neg_mask, 1, &events);
 
