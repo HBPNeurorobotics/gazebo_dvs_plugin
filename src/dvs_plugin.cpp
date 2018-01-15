@@ -74,7 +74,7 @@ namespace gazebo
     ////////////////////////////////////////////////////////////////////////////////
     // Constructor
     DvsPlugin::DvsPlugin()
-    : SensorPlugin(), width(0), height(0), depth(0)
+    : SensorPlugin(), width(0), height(0), depth(0), has_last_image(false)
   {
   }
 
@@ -200,37 +200,54 @@ float dt = 1.0 / rate;
     {
       this->processDelta(&this->last_image, &curr_image);
     }
-    this->last_image = curr_image;
-    this->has_last_image = true;
+    else if (curr_image.size().area() > 0)
+    {
+      this->last_image = curr_image;
+      this->has_last_image = true;
+    }
+    else
+    {
+      gzwarn << "Ignoring empty image." << endl;
+    }
   }
 
   void DvsPlugin::processDelta(cv::Mat *last_image, cv::Mat *curr_image)
   {
     if (curr_image->size() == last_image->size())
     {
+      cv::Mat pos_diff = *curr_image - *last_image;
+      cv::Mat neg_diff = *last_image - *curr_image;
+
+      cv::Mat pos_mask;
+      cv::Mat neg_mask;
+
+      cv::threshold(pos_diff, pos_mask, event_threshold, 255, cv::THRESH_BINARY);
+      cv::threshold(neg_diff, neg_mask, event_threshold, 255, cv::THRESH_BINARY);
+
+      *last_image += pos_mask & pos_diff;
+      *last_image -= neg_mask & neg_diff;
+
       std::vector<dvs_msgs::Event> events;
 
-      this->fillEvents(*curr_image - *last_image, 0, &events);
-      this->fillEvents(*last_image - *curr_image, 1, &events);
+      this->fillEvents(&pos_mask, 0, &events);
+      this->fillEvents(&neg_mask, 1, &events);
 
       this->publishEvents(&events);
     }
     else
     {
-      gzwarn << "Unexpected change in image size. Publishing no events for this frame change." << endl;
+      gzwarn << "Unexpected change in image size (" << last_image->size() << " -> " << curr_image->size() << "). Publishing no events for this frame change." << endl;
     }
   }
 
-  void DvsPlugin::fillEvents(cv::Mat diff, int polarity, std::vector<dvs_msgs::Event> *events)
+  void DvsPlugin::fillEvents(cv::Mat *mask, int polarity, std::vector<dvs_msgs::Event> *events)
   {
-    cv::Mat binary = diff > event_threshold;
-
     // findNonZero fails when there are no zeros
     // TODO is there a better workaround then iterating the binary image twice?
-    if (cv::countNonZero(binary) != 0)
+    if (cv::countNonZero(*mask) != 0)
     {
       std::vector<cv::Point> locs;
-      cv::findNonZero(binary, locs);
+      cv::findNonZero(*mask, locs);
 
       for (int i = 0; i < locs.size(); i++)
       {
