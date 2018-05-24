@@ -156,7 +156,6 @@ namespace gazebo
       const std::string &_format)
   {
     ros::Time received_current = ros::Time::now();
-    std::cout << "time between frames: " << (received_current - this->received_last).toSec()*1000 << std::endl;
 #if GAZEBO_MAJOR_VERSION >= 7
     _image = this->camera->ImageData(0);
 #else
@@ -202,8 +201,6 @@ namespace gazebo
     {
       gzwarn << "Ignoring empty image." << endl;
     }
-    
-    std::cout << "Time: " << (ros::Time::now() - received_current).toSec()*1000 << std::endl;
   }
 
   void DvsPlugin::appendEvent(std::vector<dvs_msgs::Event> *events, int x, int y, ros::Time ts, bool polarity)
@@ -218,6 +215,23 @@ namespace gazebo
 
   void DvsPlugin::updateDVS(ros::Time received_current, cv::Mat *curr_image)
   {
+    bool fill_events;
+    ros::param::param<bool>("/fill_events", fill_events, false);
+    if (fill_events)
+    {
+      std::vector<dvs_msgs::Event> events;
+      ros::Time ts = ros::Time::now();
+      for(int y = 0; y < curr_image->rows; y++)
+      {
+        for(int x = 0; x < curr_image->cols; x++)
+        {
+          appendEvent(&events, x, y, ts, true);
+        }
+      }
+      this->publishEvents(&events);
+      return;
+    }
+
     if (curr_image->size() == this->last_image.size())
     {
       ros::Duration delta_t = received_current - this->received_last;
