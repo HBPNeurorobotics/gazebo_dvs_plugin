@@ -155,33 +155,22 @@ namespace gazebo
       unsigned int _width, unsigned int _height, unsigned int _depth,
       const std::string &_format)
   {
+    ros::Time received_current = ros::Time::now();
 #if GAZEBO_MAJOR_VERSION >= 7
     _image = this->camera->ImageData(0);
 #else
     _image = this->camera->GetImageData(0);
 #endif
 
-    /*
-#if GAZEBO_MAJOR_VERSION >= 7
-float rate = this->camera->RenderRate();
-#else
-float rate = this->camera->GetRenderRate();
-#endif
-if (!isfinite(rate))
-rate =  30.0;
-float dt = 1.0 / rate;
-     */
-
     // convert given frame to opencv image
     cv::Mat input_image(_height, _width, CV_8UC3);
+    cv::Mat curr_image(_height, _width, CV_8UC1);
+
     input_image.data = (uchar*)_image;
+    //curr_image.data = (uchar*)_image;
 
-    // color to grayscale
-    cv::Mat curr_image_rgb(_height, _width, CV_8UC3);
-    cvtColor(input_image, curr_image_rgb, CV_RGB2BGR);
-    cvtColor(curr_image_rgb, input_image, CV_BGR2GRAY);
-
-    cv::Mat curr_image = input_image;
+    //cvtColor(input_image, input_image, CV_RGB2BGR);
+    cvtColor(input_image, curr_image, CV_BGR2GRAY);
 
 /* TODO any encoding configuration should be supported
     try {
@@ -198,16 +187,102 @@ float dt = 1.0 / rate;
     assert(_height == height && _width == width);
     if (this->has_last_image)
     {
-      this->processDelta(&this->last_image, &curr_image);
+      this->updateDVS(received_current, &curr_image);
+      this->received_last = received_current;
     }
     else if (curr_image.size().area() > 0)
     {
       this->last_image = curr_image;
+      curr_image.convertTo(this->ref_image, CV_32FC1);
+      this->received_last = received_current;
       this->has_last_image = true;
     }
     else
     {
       gzwarn << "Ignoring empty image." << endl;
+    }
+  }
+
+  void DvsPlugin::appendEvent(std::vector<dvs_msgs::Event> *events, int x, int y, ros::Time ts, bool polarity)
+  {
+    dvs_msgs::Event event_i;
+    event_i.x = x;
+    event_i.y = y;
+    event_i.ts = ts;
+    event_i.polarity = polarity;
+    events->push_back(event_i);
+  }
+
+  void DvsPlugin::updateDVS(ros::Time received_current, cv::Mat *curr_image)
+  {
+    bool fill_events;
+    ros::param::param<bool>("/fill_events", fill_events, false);
+    if (fill_events)
+    {
+      std::vector<dvs_msgs::Event> events;
+      ros::Time ts = ros::Time::now();
+      for(int y = 0; y < curr_image->rows; y++)
+      {
+        for(int x = 0; x < curr_image->cols; x++)
+        {
+          appendEvent(&events, x, y, ts, true);
+        }
+      }
+      this->publishEvents(&events);
+      return;
+    }
+
+    if (curr_image->size() == this->last_image.size())
+    {
+      ros::Duration delta_t = received_current - this->received_last;
+
+      std::vector<dvs_msgs::Event> events;
+
+      for(int y = 0; y < curr_image->rows; y++)
+      {
+        for(int x = 0; x < curr_image->cols; x++)
+        {
+          int it = (int)this->last_image.at<uchar>(y,x); // TODO check if pointer method faster than at??
+          int it_dt = (int)curr_image->at<uchar>(y,x);
+          int it_diff = it_dt-it;
+          float ref = this->ref_image.at<float>(y,x);
+
+          if(it_diff > 1e-6) // ON-Events
+          {
+            float current_crossing = ref + (this->event_threshold);
+            for(; current_crossing <= it_dt; current_crossing += (this->event_threshold))
+            {
+              ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
+              appendEvent(&events, x, y, event_ts, true);
+            }
+            current_crossing -= (this->event_threshold);
+            if(current_crossing > ref)
+              this->ref_image.at<float>(y,x) = current_crossing;
+          }
+          else if(it_diff < -1e-6) // OFF-Events
+          {
+            float current_crossing = ref - (this->event_threshold);
+            for(; current_crossing >= it_dt; current_crossing -= (this->event_threshold))
+            {
+              ros::Time event_ts = this->received_last + delta_t * ((current_crossing-(float)it) / ((float)it_diff));
+              appendEvent(&events, x, y, event_ts, false);
+            }
+            current_crossing += (this->event_threshold);
+            if(current_crossing < ref)
+              this->ref_image.at<float>(y,x) = current_crossing;
+          }
+          //else
+            //std::cout << "Pixel values numerically probably the same." << std::endl;
+        }
+      }
+
+      this->publishEvents(&events);
+      //curr_image->copyTo(this->last_image); // necessary ?? just adjust pointer??
+      this->last_image = *curr_image;
+    }
+    else
+    {
+      gzwarn << "Unexpected change in image size (" << this->last_image.size() << " -> " << curr_image->size() << "). Publishing no events for this frame change." << endl;
     }
   }
 
